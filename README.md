@@ -1,7 +1,7 @@
 # hardware_barcode_scanner
 
 [![pub package](https://img.shields.io/pub/v/hardware_barcode_scanner.svg)](https://pub.dev/packages/hardware_barcode_scanner)
-[![CI](https://github.com/eventer/hardware_barcode_scanner/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/eventer/hardware_barcode_scanner/actions/workflows/ci.yml)
+[![CI](https://github.com/guy-evdev/hardware_barcode_scanner/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/guy-evdev/hardware_barcode_scanner/actions/workflows/ci.yml)
 
 Unified scanner input for Flutter apps that support HID keyboard scanners and
 rugged Android devices that deliver scans through broadcast intents.

@@ -197,7 +197,7 @@ void main() {
 
     controller.handleTextInput('1836.35חגצהsvsk');
     controller.handleKeyEvent(
-      KeyDownEvent(
+      const KeyDownEvent(
         physicalKey: PhysicalKeyboardKey.enter,
         logicalKey: LogicalKeyboardKey.enter,
         timeStamp: Duration.zero,
@@ -220,7 +220,7 @@ void main() {
       controller.handleTextInput('ic:20');
       controller.handleTextInput('ic:202893:1801600', replaceBuffer: true);
       controller.handleKeyEvent(
-        KeyDownEvent(
+        const KeyDownEvent(
           physicalKey: PhysicalKeyboardKey.enter,
           logicalKey: LogicalKeyboardKey.enter,
           timeStamp: Duration.zero,
@@ -242,7 +242,7 @@ void main() {
     controller.handleTextInput('ic', replaceBuffer: true);
     controller.handleTextInput('ic:202893:1801600', replaceBuffer: true);
     controller.handleKeyEvent(
-      KeyDownEvent(
+      const KeyDownEvent(
         physicalKey: PhysicalKeyboardKey.enter,
         logicalKey: LogicalKeyboardKey.enter,
         timeStamp: Duration.zero,
@@ -263,7 +263,7 @@ void main() {
     controller.handleTextInput('אבc:', replaceBuffer: true);
     controller.handleTextInput('אבc:אבc:', replaceBuffer: true);
     controller.handleKeyEvent(
-      KeyDownEvent(
+      const KeyDownEvent(
         physicalKey: PhysicalKeyboardKey.enter,
         logicalKey: LogicalKeyboardKey.enter,
         timeStamp: Duration.zero,
@@ -446,7 +446,7 @@ void main() {
 
       controller.handleTextInput('91432166293086010010-1');
       controller.handleKeyEvent(
-        KeyDownEvent(
+        const KeyDownEvent(
           physicalKey: PhysicalKeyboardKey.period,
           logicalKey: LogicalKeyboardKey.period,
           character: 'ץ',
@@ -455,7 +455,7 @@ void main() {
       );
       controller.handleTextInput('2204603');
       controller.handleKeyEvent(
-        KeyDownEvent(
+        const KeyDownEvent(
           physicalKey: PhysicalKeyboardKey.enter,
           logicalKey: LogicalKeyboardKey.enter,
           timeStamp: Duration.zero,
