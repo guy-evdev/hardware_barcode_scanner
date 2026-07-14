@@ -1,0 +1,35 @@
+name: hardware_barcode_scanner
+description: Unified hardware scanner input for HID scanners and rugged Android broadcast scanners.
+version: 0.1.0
+homepage: https://github.com/eventer/hardware_barcode_scanner
+repository: https://github.com/eventer/hardware_barcode_scanner
+issue_tracker: https://github.com/eventer/hardware_barcode_scanner/issues
+topics:
+  - barcode
+  - scanner
+  - hid
+  - android
+  - input
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+  flutter: '>=3.19.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  plugin_platform_interface: ^2.1.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: '>=3.0.1 <7.0.0'
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.eventer.hardware_barcode_scanner
+        pluginClass: HardwareBarcodeScannerPlugin
+      ios:
+        pluginClass: HardwareBarcodeScannerPlugin

@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Flutter ${{ matrix.label }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: 3.19.6 (minimum)
+            flutter-version: 3.19.6
+            release-checks: false
+          - label: stable
+            flutter-version: ''
+            release-checks: true
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up minimum Flutter
+        if: matrix.release-checks == false
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ matrix.flutter-version }}
+          channel: stable
+          cache: true
+
+      - name: Set up latest stable Flutter
+        if: matrix.release-checks
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Check formatting
+        run: dart format --output=none --set-exit-if-changed lib test example/lib
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Run Flutter tests
+        run: flutter test
+
+      - name: Validate API documentation
+        if: matrix.release-checks
+        run: dart doc --dry-run
+
+      - name: Build Android example
+        if: matrix.release-checks
+        working-directory: example
+        run: flutter build apk --debug
+
+      - name: Run Android plugin tests
+        if: matrix.release-checks
+        working-directory: example/android
+        run: ./gradlew :hardware_barcode_scanner:testDebugUnitTest
+
+      - name: Validate pub.dev package
+        if: matrix.release-checks
+        run: flutter pub publish --dry-run

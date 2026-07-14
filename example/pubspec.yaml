@@ -1,0 +1,21 @@
+name: hardware_barcode_scanner_example
+description: Demonstrates how to use the hardware_barcode_scanner plugin.
+version: 1.0.0+1
+publish_to: none
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  hardware_barcode_scanner:
+    path: ../
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: '>=3.0.1 <7.0.0'
+
+flutter:
+  uses-material-design: true
