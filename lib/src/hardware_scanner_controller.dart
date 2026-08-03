@@ -291,9 +291,32 @@ class HardwareScannerController {
   /// Adds committed keyboard [text] to the current scan candidate.
   ///
   /// Delimiter characters immediately submit the buffered candidate. Otherwise
-  /// it is submitted after [HardwareScannerOptions.keyboardIdleTimeout]. Set
-  /// [replaceBuffer] when [text] represents the complete current value of an
+  /// it is submitted after [HardwareScannerOptions.keyboardIdleTimeout].
+  ///
+  /// Most applications never call this. [HardwareScannerWidget] does it, and
+  /// handles the contract below on your behalf.
+  ///
+  /// Set [replaceBuffer] when [text] is the **complete current value** of an
   /// editable control rather than a newly appended fragment.
+  ///
+  /// ⚠️ **`replaceBuffer: true` obliges the caller to clear that control after
+  /// every accepted scan.** The controller replaces its buffer with exactly
+  /// what it is handed, so a control that still holds the previous scan makes
+  /// the next scan arrive as `previous + next`, and the one after that as
+  /// `previous + next + third`. Nothing detects this — the values are
+  /// well-formed, just wrong. Clear the control when [scans] emits, or when
+  /// [events] reports an [HardwareScannerEventType.accepted] event:
+  ///
+  /// ```dart
+  /// scanner.scans.listen((scan) {
+  ///   textController.clear(); // required — see above
+  ///   handleBarcode(scan.value);
+  /// });
+  /// ```
+  ///
+  /// Leave [replaceBuffer] at `false` when forwarding individual characters, in
+  /// which case no clearing is needed because nothing accumulates outside the
+  /// controller.
   void handleTextInput(String text, {bool replaceBuffer = false}) {
     if (!_isStarted || text.isEmpty) return;
 

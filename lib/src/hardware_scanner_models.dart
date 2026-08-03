@@ -37,6 +37,10 @@ enum HardwareScannerFormat {
   aztec,
 
   /// An absent or unrecognized symbology label.
+  ///
+  /// This is the normal, expected value for every scan delivered over the HID
+  /// keyboard transport, which carries no symbology at all. It does not
+  /// indicate a problem with the scan or the scanner.
   unknown;
 
   /// All recognized formats, excluding [unknown].
@@ -173,9 +177,24 @@ class HardwareScanResult {
   final HardwareScannerSource source;
 
   /// The normalized barcode format.
+  ///
+  /// **This is always [HardwareScannerFormat.unknown] when [source] is
+  /// [HardwareScannerSource.keyboard].** A HID scanner presents itself as a
+  /// keyboard and sends only the decoded characters, so there is no channel on
+  /// which a symbology could arrive. Only
+  /// [HardwareScannerSource.androidBroadcast] can report a format, and only
+  /// when the scanner service includes one.
+  ///
+  /// Do not branch on this to distinguish barcode types unless the deployment
+  /// is broadcast-based. See [hasKnownFormat].
   final HardwareScannerFormat format;
 
   /// The original vendor-provided format label, when available.
+  ///
+  /// **Always `null` for [HardwareScannerSource.keyboard] scans**, for the
+  /// reason given on [format]. On [HardwareScannerSource.androidBroadcast] it
+  /// carries the scanner service's own label — for example `CODE_128` — before
+  /// normalization, and is still `null` when the service sends no label.
   final String? rawFormat;
 
   /// The time at which the controller accepted this scan.
@@ -185,6 +204,10 @@ class HardwareScanResult {
   final Map<String, Object?> metadata;
 
   /// Whether [format] contains a recognized symbology.
+  ///
+  /// This is `false` for every [HardwareScannerSource.keyboard] scan — see
+  /// [format]. A `false` result means "the transport did not tell us", never
+  /// "this barcode has no type".
   bool get hasKnownFormat => format != HardwareScannerFormat.unknown;
 
   @override
@@ -484,9 +507,25 @@ class HardwareScannerOptions {
         validCharacterPattern = validCharacterPattern ?? RegExp(r'^[\s\S]+$');
 
   /// Recognized formats that may be accepted.
+  ///
+  /// This filter only ever applies to scans that arrive with a symbology, which
+  /// in practice means [HardwareScannerSource.androidBroadcast]. HID keyboard
+  /// scans always report [HardwareScannerFormat.unknown] — see
+  /// [HardwareScanResult.format] — so they are governed by
+  /// [acceptUnknownFormat] instead and pass this set untouched.
   final Set<HardwareScannerFormat> supportedFormats;
 
   /// Whether values without a recognized format may be accepted.
+  ///
+  /// Defaults to `true`, and changing it is a decision about the HID transport
+  /// rather than about unusual barcodes.
+  ///
+  /// ⚠️ **Setting this to `false` rejects every HID keyboard scan**, because
+  /// those always report [HardwareScannerFormat.unknown]. Use it only when the
+  /// deployment is exclusively Android broadcast scanners whose service is
+  /// known to label every scan; otherwise the scanner appears to stop working
+  /// and the reason surfaces only as an
+  /// [HardwareScannerEventReason.unsupportedFormat] diagnostic.
   final bool acceptUnknownFormat;
 
   /// Pattern used to validate a trimmed candidate value.
@@ -513,6 +552,23 @@ class HardwareScannerOptions {
   final List<AndroidScannerBroadcastPreset> androidBroadcastPresets;
 
   /// Whether the optional Chainway SDK should be configured when available.
+  ///
+  /// **Android and Chainway devices only**, and only when the consuming app
+  /// supplies the vendor `cw-deviceapi` JAR — the package never ships one. It
+  /// is a no-op everywhere else, including on Android devices from other
+  /// vendors, and no error is reported when the SDK is absent.
+  ///
+  /// When it does apply, the package puts the scanner into broadcast output
+  /// mode and **deliberately leaves scan-failure broadcasts off**. Chainway
+  /// emits those on the same action and data key as a successful scan, with a
+  /// marker value such as `cancel`, so enabling them would deliver a phantom
+  /// scan every time a trigger pull failed to decode.
+  ///
+  /// Note the limit of that: this option controls what *this package* asks the
+  /// scanner for. A device already configured for failure broadcasts through
+  /// the vendor's own settings app will still send them, and they will arrive
+  /// as ordinary scans. Set this to `false` if you configure the scanner
+  /// yourself and do not want the package touching its output settings.
   final bool configureChainwayBroadcastOutput;
 
   /// Whether diagnostic events are printed to the Flutter and Android logs.

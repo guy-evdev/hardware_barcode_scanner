@@ -44,4 +44,76 @@ void main() {
 
     expect(calls.single.method, 'stopBroadcasts');
   });
+
+  test('startAndroidBroadcasts forwards the optional flags', () async {
+    await platform.startAndroidBroadcasts(
+      presets: [AndroidScannerBroadcastPreset.zebraDataWedge],
+      configureChainwayBroadcastOutput: false,
+      showLogs: true,
+    );
+
+    final arguments = calls.single.arguments as Map<Object?, Object?>;
+    expect(arguments['configureChainwayBroadcastOutput'], isFalse);
+    expect(arguments['showLogs'], isTrue);
+  });
+
+  group('broadcastScans', () {
+    const eventChannel = EventChannel('hardware_barcode_scanner/events');
+    late List<Object?> nativeEvents;
+
+    setUp(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockStreamHandler(
+        eventChannel,
+        MockStreamHandler.inline(
+          onListen: (arguments, sink) {
+            for (final event in nativeEvents) {
+              sink.success(event);
+            }
+            sink.endOfStream();
+          },
+        ),
+      );
+    });
+
+    tearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockStreamHandler(eventChannel, null);
+    });
+
+    test('converts native maps to string-keyed maps', () async {
+      nativeEvents = <Object?>[
+        <Object?, Object?>{
+          'value': 'ABC-123',
+          'format': 'CODE_128',
+          'preset': 'chainway',
+        },
+      ];
+
+      final scans =
+          await MethodChannelHardwareBarcodeScanner().broadcastScans.toList();
+
+      expect(scans.single, <String, Object?>{
+        'value': 'ABC-123',
+        'format': 'CODE_128',
+        'preset': 'chainway',
+      });
+    });
+
+    test('reports a non-map native event as an error payload', () async {
+      nativeEvents = <Object?>[42];
+
+      final scans =
+          await MethodChannelHardwareBarcodeScanner().broadcastScans.toList();
+
+      expect(scans.single['error'], 'Unexpected native event: 42');
+    });
+
+    test('the stream is created once and reused', () {
+      final instance = MethodChannelHardwareBarcodeScanner();
+      nativeEvents = <Object?>[];
+
+      expect(instance.broadcastScans, same(instance.broadcastScans));
+    });
+  });
 }

@@ -1,8 +1,15 @@
+# flutter-package template rev 2 — per-push lane.
+# Kept fast enough to actually wait for. Slow and release-only checks live in release.yml.
+# See CLAUDE.md §4.
+#
+# This replaces a single matrix job that used `if: matrix.release-checks` to fake the same split.
+# Two files make the trigger explicit and let the release lane be dispatched on demand.
+
 name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'release/**']
   pull_request:
   workflow_dispatch:
 
@@ -14,65 +21,57 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
-    name: Flutter ${{ matrix.label }}
+  # Verifies the Flutter floor advertised in pubspec.yaml (>=3.19.0). Nothing else does.
+  minimum-sdk:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - label: 3.19.6 (minimum)
-            flutter-version: 3.19.6
-            release-checks: false
-          - label: stable
-            flutter-version: ''
-            release-checks: true
-
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
-
       - name: Set up minimum Flutter
-        if: matrix.release-checks == false
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: ${{ matrix.flutter-version }}
+          flutter-version: 3.19.6
           channel: stable
           cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
 
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
       - name: Set up latest stable Flutter
-        if: matrix.release-checks
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
-
-      - name: Install dependencies
-        run: flutter pub get
+      - run: flutter pub get
 
       - name: Check formatting
-        run: dart format --output=none --set-exit-if-changed lib test example/lib
+        run: dart format --output=none --set-exit-if-changed .
 
       - name: Analyze
         run: flutter analyze
 
-      - name: Run Flutter tests
-        run: flutter test
+      - name: VM tests with coverage
+        run: flutter test --coverage
 
-      - name: Validate API documentation
-        if: matrix.release-checks
-        run: dart doc --dry-run
+      # Ratchets up, never down (CLAUDE.md §4). Measured 100.00% (379/379) on 2026-08-02.
+      # The floor sits one point under the measured value: enough headroom for a single
+      # genuinely unreachable line, tight enough that losing a covered path fails the build.
+      - name: Enforce 99% line coverage
+        run: |
+          awk -F '[:,]' '$1 == "DA" { total++; covered += ($3 > 0) } END { if (total == 0 || covered * 100 / total < 99) exit 1; printf "Line coverage: %.2f%%\n", covered * 100 / total }' coverage/lcov.info
 
-      - name: Build Android example
-        if: matrix.release-checks
-        working-directory: example
-        run: flutter build apk --debug
-
-      - name: Run Android plugin tests
-        if: matrix.release-checks
-        working-directory: example/android
-        run: ./gradlew :hardware_barcode_scanner:testDebugUnitTest
-
+      # Cheap, and the only thing that catches a new top-level file leaking into the archive.
       - name: Validate pub.dev package
-        if: matrix.release-checks
         run: flutter pub publish --dry-run
+
+  # No Chrome lane: no web support.
+  # No example-test step: the example app has no test suite. The empty example/test and
+  # example/integration_test directories were removed on 2026-08-02 rather than left looking
+  # like suites that CI declines to run. Add both the tests and the step together, not one
+  # without the other — `flutter test` fails on an empty directory.
+  # The Android example build and Gradle unit tests are in release.yml.

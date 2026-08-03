@@ -12,6 +12,12 @@ import 'src/hardware_scanner_models.dart';
 /// Default scanner platform implementation backed by Flutter channels.
 class MethodChannelHardwareBarcodeScanner
     extends HardwareBarcodeScannerPlatform {
+  /// Creates the default platform implementation.
+  ///
+  /// [HardwareBarcodeScannerPlatform.instance] already holds one of these, so
+  /// applications rarely need to construct it themselves.
+  MethodChannelHardwareBarcodeScanner();
+
   /// Channel used to start and stop the native scanner integration.
   @visibleForTesting
   final methodChannel = const MethodChannel('hardware_barcode_scanner/methods');

@@ -6,6 +6,20 @@
 Unified scanner input for Flutter apps that support HID keyboard scanners and
 rugged Android devices that deliver scans through broadcast intents.
 
+## When to use this package
+
+- The barcodes are read by **dedicated scanner hardware** — USB, Bluetooth, or built-in — rather
+  than by the device camera.
+- The app has to support both HID keyboard scanners and rugged Android devices that deliver scans
+  through broadcast intents, **without branching on the transport**.
+- No runtime permission, manifest entry, or camera access is wanted: the plugin registers its
+  broadcast receiver only while a controller is started.
+- Scanner input has to keep working while the UI has focus elsewhere, with duplicate suppression
+  and format filtering handled for you.
+
+**Not a fit if** the barcodes are read from the device camera — this package never decodes an
+image, it only normalizes input that scanner hardware has already decoded.
+
 ## Features
 
 - USB, Bluetooth, and built-in HID scanners through Flutter keyboard events.
@@ -119,87 +133,38 @@ scanner.events.listen((event) {
 });
 ```
 
-Unknown formats are accepted by default because HID scanners normally provide
-decoded text without symbology metadata. Reported native formats are normalized
-and checked against `supportedFormats`. Surrounding whitespace is removed from
-accepted values. Anchor `validCharacterPattern` with `^` and `$` when the whole
-value must match.
+**A HID scanner never reports a barcode format.** It presents itself as a
+keyboard and sends the decoded characters, so `format` is always
+`HardwareScannerFormat.unknown` and `rawFormat` is always `null` for those
+scans. This is not a limitation of the package — there is nothing in a keystroke
+stream to read a symbology from. Only Android broadcast scanners can report a
+format, and only when the scanner service includes one.
+
+Two consequences worth knowing before you configure filtering:
+
+- `supportedFormats` has no effect on HID scans. They carry no format, so
+  nothing is there to match.
+- **`acceptUnknownFormat: false` rejects every HID scan.** It is on by default
+  for exactly this reason. Turn it off only in a deployment that is exclusively
+  broadcast scanners.
+
+Reported native formats are normalized and checked against `supportedFormats`.
+Surrounding whitespace is removed from accepted values. Anchor
+`validCharacterPattern` with `^` and `$` when the whole value must match.
 
 Call `pause()` before processing a scan if subsequent scanner input should be
 ignored temporarily, then call `resume()` when processing is complete.
 
-## Unicode and keyboard layouts
+## Advanced usage
 
-The default mode preserves text committed by the operating system, including
-Hebrew, emoji, and mixed Unicode values such as `1836.35חגצהsvsk`.
+The following live in [`doc/recipes.md`](doc/recipes.md):
 
-Some ASCII-only scanners identify as a US keyboard while the device uses a
-different keyboard layout. In that case, punctuation can be transformed before
-Flutter receives it. Opt into physical US-key interpretation for those scanners:
-
-```dart
-final scanner = HardwareScannerController(
-  options: HardwareScannerOptions(preferPhysicalKeyboardInput: true),
-);
-```
-
-Do not enable this option for values that contain real Unicode text. Native
-scanner broadcasts are the most reliable option when exact decoded data is
-available from the device.
-
-## Android broadcast scanners
-
-The default presets cover commonly used actions and extra names for Chainway,
-Zebra DataWedge, Honeywell, Datalogic, Unitech, CipherLab, Urovo/Seuic, and
-generic scanner services. Scanner services differ by model and configuration,
-so configure the device to emit one of the preset actions or provide your own:
-
-```dart
-final scanner = HardwareScannerController(
-  options: HardwareScannerOptions(
-    androidBroadcastPresets: const [
-      AndroidScannerBroadcastPreset(
-        name: 'my_scanner',
-        actions: {'com.example.scanner.SCAN'},
-        dataKeys: ['scan_data'],
-        formatKeys: ['scan_type'],
-      ),
-    ],
-  ),
-);
-```
-
-Android scanner broadcasts are not an authenticated transport. Use application
-validation appropriate for your barcode format, especially if a scanned value
-can trigger a sensitive operation.
-
-### Optional Chainway SDK
-
-The package does not require vendor JARs when a device is already configured to
-emit broadcasts. If a Chainway device needs programmatic configuration, add the
-vendor-provided `cw-deviceapi*.jar` to the consuming app:
-
-```text
-android/app/libs/cw-deviceapi20191022.jar
-```
-
-Then include local JARs in `android/app/build.gradle`:
-
-```groovy
-dependencies {
-    implementation fileTree(dir: 'libs', include: ['*.jar'])
-}
-```
-
-The plugin detects the SDK through reflection when
-`configureChainwayBroadcastOutput` is enabled. Do not redistribute a vendor JAR
-unless its license allows it. Consumer R8/ProGuard rules for the reflected
-classes are bundled with the plugin.
-
-## Logging
-
-Set `HardwareScannerOptions(showLogs: true)` to print diagnostics to the Flutter
-console and Android logcat. Logging is off by default and can include scanned
-values, so enable it only when appropriate for your data-handling policy.
+- [Unicode and keyboard layouts](doc/recipes.md#unicode-and-keyboard-layouts) — preserving Unicode
+  values, and the opt-in physical US-keyboard mode for ASCII-only scanners.
+- [Android broadcast scanners](doc/recipes.md#android-broadcast-scanners) — the bundled vendor
+  presets, defining your own, and why broadcasts are not an authenticated transport.
+- [Optional Chainway SDK](doc/recipes.md#optional-chainway-sdk) — reflection-based configuration
+  for devices that need it.
+- [Logging](doc/recipes.md#logging) — diagnostics, and the data-handling caveat.
 
 See the [`example`](example/lib/main.dart) for a complete runnable app.

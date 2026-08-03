@@ -1,0 +1,85 @@
+# flutter-package template rev 2 — release lane.
+# Everything too slow or too release-specific for every push. Runs on release branches, tags, and
+# on demand. See CLAUDE.md §4.
+#
+# Every check here must be able to fail. A step whose failure is ignored is decoration, not a gate.
+#
+# Note what this lane still cannot prove: neither transport works on an emulator. A real HID
+# scanner and a real Android broadcast scanner are a manual release gate — see RELEASE_WORKFLOW.md.
+
+name: Release gates
+
+on:
+  push:
+    branches: ['release/**']
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docs-and-score:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Set up latest stable Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+
+      - name: Validate API documentation
+        run: dart doc --dry-run
+
+      # --exit-code-threshold is the MAXIMUM POINTS THE PACKAGE MAY LOSE, not the minimum score:
+      # pana exits non-zero when (max - granted) > threshold. `0` therefore requires a perfect
+      # 160/160, which is what this package measured with pana 0.23.15 on 2026-08-02.
+      #
+      # ⚠️ This said `160` until 2026-08-02, which reads as "require 160/160" but means "tolerate
+      # losing 160 points" — it passed at every achievable score. The first release-lane run went
+      # green while pana printed `Points: 150/160`. Never set this to the measured score; see
+      # template rev 2 and CLAUDE.md §4.
+      #
+      # pana verifies `repository` by cloning it and comparing that checkout's pubspec.yaml to the
+      # local one — and it clones the DEFAULT BRANCH. The 2026-08-02 URL fix (eventer ->
+      # guy-evdev) must be on `main` before this gate can pass; until then pana scores 0/10 on
+      # "Provide a valid pubspec.yaml" and this step fails at 150/160. See ROADMAP.md.
+      - name: Pana
+        run: |
+          dart pub global activate pana
+          dart pub global run pana:pana --no-warning --exit-code-threshold 0
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Set up latest stable Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+
+      - name: Build Android example
+        working-directory: example
+        run: flutter build apk --debug
+
+      # Flutter creates the example app's Gradle wrapper during the build above.
+      - name: Run Android plugin tests
+        working-directory: example/android
+        run: ./gradlew :hardware_barcode_scanner:testDebugUnitTest
+
+  # No iOS lane yet: there is no XCTest target. Tracked as a 0.2.0 item in ROADMAP.md.

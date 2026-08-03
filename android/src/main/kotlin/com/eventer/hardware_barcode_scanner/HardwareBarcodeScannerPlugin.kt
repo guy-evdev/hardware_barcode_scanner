@@ -283,11 +283,20 @@ class HardwareBarcodeScannerPlugin :
                 context,
                 false,
             )
+            // Failure broadcasts are deliberately OFF.
+            //
+            // Chainway sends them on the same action and the same data key as a
+            // successful scan, with a marker value such as "cancel", so nothing
+            // downstream can tell a failed trigger pull from a barcode that
+            // happens to read that way. Asking for them produced a phantom scan
+            // every time a trigger pull did not decode — observed on a C66,
+            // 2026-08-03. The package has no way to interpret them, so it does
+            // not request them.
             call(
                 "setScanFailureBroadcast",
                 arrayOf(Context::class.java, Boolean::class.javaPrimitiveType),
                 context,
-                true,
+                false,
             )
             call(
                 "enableContinuousScan",

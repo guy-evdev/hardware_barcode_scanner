@@ -31,3 +31,9 @@ migrate_working_dir/
 .flutter-plugins-dependencies
 /build/
 /coverage/
+
+# Local maintainer files (flutter-package template)
+/CLAUDE.md
+/RELEASE_WORKFLOW.md
+/ROADMAP.md
+/ROADMAP_HISTORY.md
