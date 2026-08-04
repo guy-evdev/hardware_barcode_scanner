@@ -137,7 +137,7 @@ void main() {
       expect(scans.single.value, 'a');
     });
 
-    testWidgets('an enter key submits text already in the hidden field', (
+    testWidgets('the platform submit terminates, not the terminator key', (
       tester,
     ) async {
       final scans = <HardwareScanResult>[];
@@ -154,10 +154,51 @@ void main() {
       await tester.pump();
 
       await tester.enterText(find.byType(EditableText), 'EV-12345');
+
+      // Once committed text is driving the scan, the key-event channel is an
+      // unordered duplicate of it and the terminator key is ignored — acting on
+      // it truncates scans when the text lags behind. See the racing test below.
       await pressEnter(tester);
+      await tester.pump();
+      expect(scans, isEmpty);
+
+      await tester.testTextInput.receiveAction(TextInputAction.done);
       await tester.pump();
 
       expect(scans.single.value, 'EV-12345');
+    });
+
+    testWidgets('a terminator key racing the platform text does not truncate', (
+      tester,
+    ) async {
+      final scans = <HardwareScanResult>[];
+      final controller = buildController(
+        options: HardwareScannerOptions(
+          keyboardIdleTimeout: const Duration(seconds: 30),
+        ),
+        scans: scans,
+      );
+
+      await tester.pumpWidget(
+        wrap(HardwareScannerWidget(controller: controller)),
+      );
+      await tester.pump();
+
+      // Key events and committed platform text arrive on separate channels, and
+      // the text one can lag: observed on iOS, where only the first character
+      // had been committed by the time the terminator key landed. Acting on the
+      // key there flushes a partial buffer, so the app sees a truncated scan
+      // followed by the real one.
+      await tester.enterText(find.byType(EditableText), 'a');
+      await pressEnter(tester);
+      await tester.pump();
+
+      await tester.enterText(find.byType(EditableText), 'a100014');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+      await tester.pump();
+
+      expect(scans.map((scan) => scan.value), <String>['a100014']);
     });
 
     testWidgets('a submit action from the platform closes the scan', (
@@ -358,6 +399,69 @@ void main() {
       await settleTimers(tester);
 
       expect(scans, isEmpty);
+    });
+
+    testWidgets('a submit action does not leave the scanner unfocused', (
+      tester,
+    ) async {
+      final scans = <HardwareScanResult>[];
+      final controller = buildController(
+        options: HardwareScannerOptions(
+          keyboardIdleTimeout: const Duration(seconds: 30),
+        ),
+        scans: scans,
+      );
+      final focusNode = FocusNode();
+      addTearDown(focusNode.dispose);
+
+      await tester.pumpWidget(
+        wrap(
+          HardwareScannerWidget(controller: controller, focusNode: focusNode),
+        ),
+      );
+      await tester.pump();
+      expect(focusNode.hasFocus, isTrue);
+
+      await tester.enterText(find.byType(EditableText), 'EV-1');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+      await tester.pump();
+
+      expect(scans.single.value, 'EV-1');
+      expect(
+        focusNode.hasFocus,
+        isTrue,
+        reason: 'a submit action unfocuses a single-line editable, and without '
+            'taking focus back the scanner stops after one scan',
+      );
+    });
+
+    testWidgets('consecutive terminated scans keep arriving', (tester) async {
+      final scans = <HardwareScanResult>[];
+      final controller = buildController(
+        options: HardwareScannerOptions(
+          keyboardIdleTimeout: const Duration(seconds: 30),
+        ),
+        scans: scans,
+      );
+
+      await tester.pumpWidget(
+        wrap(HardwareScannerWidget(controller: controller)),
+      );
+      await tester.pump();
+
+      for (final code in <String>['EV-1', 'EV-2', 'EV-3']) {
+        await tester.enterText(find.byType(EditableText), code);
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pump();
+        await tester.pump();
+      }
+
+      expect(
+        scans.map((scan) => scan.value),
+        <String>['EV-1', 'EV-2', 'EV-3'],
+        reason: 'scanning used to stop after the first terminated scan',
+      );
     });
 
     testWidgets('resume restores focus to the scanner', (tester) async {
