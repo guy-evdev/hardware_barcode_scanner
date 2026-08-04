@@ -77,6 +77,33 @@ void main() {
       expect(controller.isStarted, isTrue);
     });
 
+    test('stopping clears the paused state', () async {
+      final platform = FakeHardwareBarcodeScannerPlatform();
+      final controller = HardwareScannerController(platform: platform);
+      addTearDown(controller.dispose);
+
+      await controller.start();
+      controller.pause();
+      expect(controller.isPaused, isTrue);
+
+      await controller.stop();
+      await controller.start();
+
+      expect(
+        controller.isPaused,
+        isFalse,
+        reason: 'a restarted controller must not be silently paused',
+      );
+
+      final scanFuture = controller.scans.first;
+      controller.acceptRawScan(
+        value: 'EV-AFTER-RESTART',
+        source: HardwareScannerSource.keyboard,
+      );
+
+      expect(await scanFuture.then((scan) => scan.value), 'EV-AFTER-RESTART');
+    });
+
     test('dispose stops the controller and closes both streams', () async {
       final platform = FakeHardwareBarcodeScannerPlatform();
       final controller = HardwareScannerController(platform: platform);
@@ -95,6 +122,23 @@ void main() {
 
       await controller.dispose();
       await expectLater(controller.dispose(), completes);
+    });
+
+    test('a scan submitted after dispose is dropped, not thrown', () async {
+      final platform = FakeHardwareBarcodeScannerPlatform();
+      final controller = HardwareScannerController(platform: platform);
+
+      await controller.start();
+      await controller.dispose();
+
+      expect(
+        () => controller.acceptRawScan(
+          value: 'EV-AFTER-DISPOSE',
+          source: HardwareScannerSource.keyboard,
+        ),
+        returnsNormally,
+        reason: 'the streams are closed, so adding to them would throw',
+      );
     });
 
     test('start after dispose throws a StateError', () async {

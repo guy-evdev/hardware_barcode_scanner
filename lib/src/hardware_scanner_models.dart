@@ -142,7 +142,7 @@ enum HardwareScannerEventReason {
   /// A candidate's reported format is not enabled.
   unsupportedFormat,
 
-  /// A recently accepted value and format were received again.
+  /// A recently accepted value was received again.
   duplicate,
 
   /// The native plugin is unavailable on the current platform.
@@ -539,7 +539,13 @@ class HardwareScannerOptions {
   /// Inactivity duration after which buffered keyboard data is submitted.
   final Duration keyboardIdleTimeout;
 
-  /// Time during which an identical value and format are ignored.
+  /// Time during which an identical value is ignored.
+  ///
+  /// Suppression compares the value only, deliberately ignoring both the
+  /// reported format and the transport. A rugged device configured for both
+  /// keystroke output and intent output delivers one physical scan twice — once
+  /// with no symbology over HID and once with the real one over the broadcast —
+  /// and comparing formats would let that through as two scans.
   final Duration duplicateSuppressionWindow;
 
   /// Whether HID keys are interpreted using their physical US-keyboard layout.

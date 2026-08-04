@@ -263,13 +263,17 @@ class _HardwareScannerWidgetState extends State<HardwareScannerWidget> {
   bool _shouldClearTextInputForEvent(HardwareScannerEvent event) {
     if (!widget.captureTextInput) return false;
     if (event.source != HardwareScannerSource.keyboard) return false;
-    if (event.type == HardwareScannerEventType.accepted) return true;
-    if (event.type != HardwareScannerEventType.ignored) return false;
 
-    return event.reason == HardwareScannerEventReason.emptyPayload ||
-        event.reason == HardwareScannerEventReason.invalidCharacters ||
-        event.reason == HardwareScannerEventReason.unsupportedFormat ||
-        event.reason == HardwareScannerEventReason.duplicate;
+    // Accepted and ignored are both terminal decisions on the candidate, so
+    // the editable must not keep holding it either way.
+    //
+    // Deliberately not a list of specific ignore reasons. It used to be, and
+    // `paused` was missing from it: a scan arriving while the controller was
+    // paused left its text in the field, and the next accepted scan came
+    // through as `leftover + newScan`. Testing the category rather than
+    // enumerating reasons means a future reason cannot reintroduce that.
+    return event.type == HardwareScannerEventType.accepted ||
+        event.type == HardwareScannerEventType.ignored;
   }
 
   void _subscribeToLifecycleEvents() {

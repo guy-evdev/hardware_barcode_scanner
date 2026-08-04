@@ -57,6 +57,35 @@ void main() {
     expect(arguments['showLogs'], isTrue);
   });
 
+  group('web', () {
+    // The channel has no web implementation, and on the web an unimplemented
+    // channel never answers at all — the message sits in a one-message buffer
+    // and the future never completes (flutter/flutter#52780). Without these
+    // guards, `HardwareScannerController.start()` hangs forever on the web and
+    // its MissingPluginException handler never runs.
+    final webPlatform = MethodChannelHardwareBarcodeScanner(isWeb: true);
+
+    test('startAndroidBroadcasts reports the plugin as missing', () async {
+      await expectLater(
+        webPlatform.startAndroidBroadcasts(presets: const []),
+        throwsA(isA<MissingPluginException>()),
+      );
+      expect(calls, isEmpty, reason: 'the channel must not be touched');
+    });
+
+    test('stopAndroidBroadcasts reports the plugin as missing', () async {
+      await expectLater(
+        webPlatform.stopAndroidBroadcasts(),
+        throwsA(isA<MissingPluginException>()),
+      );
+      expect(calls, isEmpty, reason: 'the channel must not be touched');
+    });
+
+    test('broadcastScans is empty rather than pending', () async {
+      expect(await webPlatform.broadcastScans.toList(), isEmpty);
+    });
+  });
+
   group('broadcastScans', () {
     const eventChannel = EventChannel('hardware_barcode_scanner/events');
     late List<Object?> nativeEvents;

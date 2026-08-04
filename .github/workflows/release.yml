@@ -1,4 +1,4 @@
-# flutter-package template rev 2 — release lane.
+# flutter-package template rev 3 — release lane.
 # Everything too slow or too release-specific for every push. Runs on release branches, tags, and
 # on demand. See CLAUDE.md §4.
 #

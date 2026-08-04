@@ -225,6 +225,32 @@ void main() {
       );
     });
 
+    testWidgets('a scan arriving while paused clears the hidden field', (
+      tester,
+    ) async {
+      final scans = <HardwareScanResult>[];
+      final controller = buildController(scans: scans);
+
+      await tester.pumpWidget(
+        wrap(HardwareScannerWidget(controller: controller)),
+      );
+      await tester.pump();
+
+      // The common consumer pattern: pause while the scan is processed. An
+      // operator scanning again during that window must not leave text behind,
+      // or the next accepted scan arrives as `leftover + newScan`.
+      controller.pause();
+      await tester.enterText(find.byType(EditableText), 'EV-WHILE-PAUSED');
+      await settleTimers(tester);
+
+      expect(scans, isEmpty);
+      expect(
+        hiddenText(tester),
+        isEmpty,
+        reason: 'a scan rejected while paused must not leak into the next one',
+      );
+    });
+
     testWidgets('a duplicate scan clears the hidden field', (tester) async {
       final scans = <HardwareScanResult>[];
       final controller = buildController(
