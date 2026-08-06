@@ -36,7 +36,6 @@ class HardwareScannerController {
   bool _isPaused = false;
   bool _isDisposed = false;
   String? _lastAcceptedValue;
-  HardwareScannerFormat? _lastAcceptedFormat;
   DateTime? _lastAcceptedAt;
 
   static final _physicalKeyCharacters = <PhysicalKeyboardKey, String>{
@@ -227,6 +226,9 @@ class HardwareScannerController {
   ///
   /// Calling this method while stopped has no effect. The controller can be
   /// started again until [dispose] is called.
+  ///
+  /// This also clears [isPaused], because pausing describes a running
+  /// controller. A controller that is started again is never still paused.
   Future<void> stop() async {
     if (!_isStarted) return;
 
@@ -252,6 +254,11 @@ class HardwareScannerController {
     }
 
     _isStarted = false;
+    // Pausing describes a running controller, so stopping discards it.
+    // Without this, `pause(); stop(); start();` returns a controller that is
+    // started but silently drops every scan, having emitted no `paused` event
+    // that a consumer subscribing after the restart could see.
+    _isPaused = false;
     _emitLifecycle(HardwareScannerEventReason.stopped);
   }
 
@@ -409,6 +416,18 @@ class HardwareScannerController {
   void _flushKeyboardBuffer() {
     _keyboardIdleTimer?.cancel();
     _keyboardIdleTimer = null;
+
+    // A delimiter with nothing buffered has no candidate to submit, so it
+    // reports nothing. One Enter can reach the controller twice — the widget
+    // sees it both as a key event and as the platform's submit action — and
+    // treating the second, empty flush as a rejected candidate put a junk
+    // `emptyPayload` in the diagnostics stream on every single scan.
+    //
+    // `emptyPayload` still means what it says for a candidate that existed and
+    // held no data, such as a whitespace-only value or a broadcast payload
+    // with no value.
+    if (_keyboardBuffer.isEmpty) return;
+
     final value = _keyboardBuffer.toString();
     _keyboardBuffer.clear();
     _acceptCandidate(value: value, source: HardwareScannerSource.keyboard);
@@ -455,6 +474,10 @@ class HardwareScannerController {
     String? rawFormat,
     Map<String, Object?> metadata = const <String, Object?>{},
   }) {
+    // Both streams are closed by dispose, so a late candidate is dropped rather
+    // than allowed to throw on a closed controller.
+    if (_isDisposed) return;
+
     final timestamp = DateTime.now();
     final trimmedValue = value?.trim() ?? '';
     final format = HardwareScannerFormat.fromRaw(rawFormat);
@@ -524,7 +547,7 @@ class HardwareScannerController {
       return;
     }
 
-    if (_isDuplicate(trimmedValue, format, timestamp)) {
+    if (_isDuplicate(trimmedValue, timestamp)) {
       _emitIgnored(
         HardwareScannerEventReason.duplicate,
         source,
@@ -547,7 +570,6 @@ class HardwareScannerController {
     );
 
     _lastAcceptedValue = trimmedValue;
-    _lastAcceptedFormat = format;
     _lastAcceptedAt = timestamp;
 
     _scansController.add(result);
@@ -566,14 +588,9 @@ class HardwareScannerController {
     );
   }
 
-  bool _isDuplicate(
-    String value,
-    HardwareScannerFormat format,
-    DateTime timestamp,
-  ) {
+  bool _isDuplicate(String value, DateTime timestamp) {
     final lastAcceptedAt = _lastAcceptedAt;
     if (lastAcceptedAt == null || _lastAcceptedValue != value) return false;
-    if (_lastAcceptedFormat != format) return false;
     return timestamp.difference(lastAcceptedAt) <=
         options.duplicateSuppressionWindow;
   }

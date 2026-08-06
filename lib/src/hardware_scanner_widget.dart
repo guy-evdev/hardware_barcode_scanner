@@ -213,9 +213,20 @@ class _HardwareScannerWidgetState extends State<HardwareScannerWidget> {
     }
 
     if (_textInputActive) {
-      if (widget.controller.options.keyboardDelimiters.contains(character)) {
-        widget.controller.handleTextInput(character);
-      }
+      // The platform text pipeline is driving this scan, so the key-event
+      // channel is a second, unordered copy of the same input — including the
+      // terminator. Ignore it entirely.
+      //
+      // The two channels are not synchronised. Committed text can lag behind
+      // key events, and acting on a terminator key that arrives early flushes a
+      // partial buffer: on iOS this produced a truncated scan immediately
+      // followed by the complete one, because only the first character had been
+      // committed when the terminator landed.
+      //
+      // Terminating from the same pipeline that delivers the characters — the
+      // editable's submit action — keeps the terminator ordered with respect to
+      // them. A platform that somehow delivers no submit action still finishes
+      // the scan through `keyboardIdleTimeout`.
       return false;
     }
 
@@ -256,20 +267,38 @@ class _HardwareScannerWidgetState extends State<HardwareScannerWidget> {
 
   void _clearHiddenTextInput() {
     _textInputActive = false;
-    if (_textController.text.isEmpty) return;
-    _textController.clear();
+    if (_textController.text.isNotEmpty) {
+      _textController.clear();
+    }
+
+    // Take focus back, because finishing a scan can take it away.
+    //
+    // A scanner's terminator reaches the platform as a submit action, and
+    // `EditableText.performAction` finalizes a single-line field by calling
+    // `focusNode.unfocus()`. The hidden editable then has no input connection
+    // and `_handleHardwareKeyEvent` bails on `hasFocus`, so **scanning stops
+    // dead after the first terminated scan** and never recovers — focus was
+    // only ever re-requested on `started` and `resumed`.
+    //
+    // Consumers that pause and resume around each scan never saw this, because
+    // `resumed` happened to restore focus for them.
+    _requestFocusAfterFrame();
   }
 
   bool _shouldClearTextInputForEvent(HardwareScannerEvent event) {
     if (!widget.captureTextInput) return false;
     if (event.source != HardwareScannerSource.keyboard) return false;
-    if (event.type == HardwareScannerEventType.accepted) return true;
-    if (event.type != HardwareScannerEventType.ignored) return false;
 
-    return event.reason == HardwareScannerEventReason.emptyPayload ||
-        event.reason == HardwareScannerEventReason.invalidCharacters ||
-        event.reason == HardwareScannerEventReason.unsupportedFormat ||
-        event.reason == HardwareScannerEventReason.duplicate;
+    // Accepted and ignored are both terminal decisions on the candidate, so
+    // the editable must not keep holding it either way.
+    //
+    // Deliberately not a list of specific ignore reasons. It used to be, and
+    // `paused` was missing from it: a scan arriving while the controller was
+    // paused left its text in the field, and the next accepted scan came
+    // through as `leftover + newScan`. Testing the category rather than
+    // enumerating reasons means a future reason cannot reintroduce that.
+    return event.type == HardwareScannerEventType.accepted ||
+        event.type == HardwareScannerEventType.ignored;
   }
 
   void _subscribeToLifecycleEvents() {

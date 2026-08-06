@@ -1,3 +1,20 @@
+## 0.1.1
+
+### August 4, 2026
+
+**Fixed:**
+
+* Scanning no longer stops after the first scan.
+* Scans are no longer truncated when the platform delivers characters slowly.
+* A scan arriving while the controller is paused no longer leaks into the next one.
+* One physical scan reaching the app over both transports is now delivered once.
+
+**Compatibility:**
+
+* Duplicate suppression compares the scanned value only, no longer the value and its format.
+
+See [What's new in 0.1.1](doc/whats_new_0_1_1.md) for details and examples.
+
 ## 0.1.0
 
 ### August 3, 2026

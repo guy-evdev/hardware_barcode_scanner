@@ -145,7 +145,7 @@ void main() {
       );
     });
 
-    test('treats the same value with a different format as new', () async {
+    test('suppresses the same value even when the format differs', () async {
       final harness = await startController();
 
       harness.platform.emitScan('ABC-123', format: 'CODE_128');
@@ -153,10 +153,37 @@ void main() {
       harness.platform.emitScan('ABC-123', format: 'QR_CODE');
       await pumpEventQueue();
 
-      expect(harness.scans.map((scan) => scan.format), <HardwareScannerFormat>[
-        HardwareScannerFormat.code128,
-        HardwareScannerFormat.qrCode,
-      ]);
+      // Suppression is by value alone. It used to require the format to match
+      // too, which meant one physical scan reaching the app over both
+      // transports was delivered twice — see the cross-transport test below.
+      expect(harness.scans, hasLength(1));
+      expect(harness.scans.single.format, HardwareScannerFormat.code128);
+    });
+
+    test('suppresses one physical scan arriving on both transports', () async {
+      final harness = await startController();
+
+      // A rugged device configured for both keystroke output and intent output
+      // sends the same scan twice. HID carries no symbology, the broadcast
+      // does, so the two arrive with different formats despite being one scan.
+      harness.controller.acceptRawScan(
+        value: 'ABC-123',
+        source: HardwareScannerSource.keyboard,
+      );
+      harness.platform.emitScan('ABC-123', format: 'CODE_128');
+      await pumpEventQueue();
+
+      expect(harness.scans, hasLength(1));
+      expect(harness.scans.single.source, HardwareScannerSource.keyboard);
+      expect(
+        harness.events
+            .where(
+              (event) => event.reason == HardwareScannerEventReason.duplicate,
+            )
+            .single
+            .source,
+        HardwareScannerSource.androidBroadcast,
+      );
     });
 
     test('a different value inside the window is not suppressed', () async {
@@ -523,10 +550,48 @@ void main() {
       expect(harness.scans.map((scan) => scan.value), <String>['EV-1', 'EV-2']);
     });
 
-    test('a lone delimiter is reported as an empty payload', () async {
+    test('a delimiter with nothing buffered submits nothing', () async {
       final harness = await startController();
 
       harness.controller.handleTextInput('\n');
+      await pumpEventQueue();
+
+      expect(harness.scans, isEmpty);
+      expect(
+        harness.events.where(
+          (event) => event.type == HardwareScannerEventType.ignored,
+        ),
+        isEmpty,
+        reason: 'there was no candidate to reject',
+      );
+    });
+
+    test('a repeated delimiter does not report an empty payload', () async {
+      final harness = await startController(
+        keyboardIdleTimeout: const Duration(seconds: 30),
+      );
+
+      // The widget can see one Enter twice — once as a key event and once as
+      // the platform's submit action — so the second flush finds an empty
+      // buffer. That must not put a junk event in the diagnostics stream,
+      // which is the stream consumers use for operator feedback.
+      harness.controller.handleTextInput('EV-1\n');
+      harness.controller.handleTextInput('\n');
+      await pumpEventQueue();
+
+      expect(harness.scans.single.value, 'EV-1');
+      expect(
+        harness.events.where(
+          (event) => event.reason == HardwareScannerEventReason.emptyPayload,
+        ),
+        isEmpty,
+      );
+    });
+
+    test('a whitespace-only value is still an empty payload', () async {
+      final harness = await startController();
+
+      harness.controller.handleTextInput('   \n');
       await pumpEventQueue();
 
       expect(harness.scans, isEmpty);
@@ -539,6 +604,7 @@ void main() {
             .single
             .type,
         HardwareScannerEventType.ignored,
+        reason: 'a candidate did exist, it just had no data',
       );
     });
   });
