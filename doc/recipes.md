@@ -42,8 +42,8 @@ preference:
 1. **Use an Android broadcast scanner.** Its service sends the label alongside the data, which is
    the only transport here that can report a format at all.
 2. **Infer it from the value.** For fixed-layout barcodes this is usually enough — a 13-digit
-   numeric value is an EAN-13, a known prefix identifies a badge, and so on. Do this in your own
-   code, against your own data, rather than expecting the package to guess.
+   numeric value is an EAN-13, a known prefix identifies your own value format, and so on. Do this
+   in your own code, against your own data, rather than expecting the package to guess.
 3. **Enable the scanner's Code ID or AIM identifier prefix** — and read the warning below first.
 
 ⚠️ **The package does not parse symbology prefixes.** Many handheld scanners can be configured to

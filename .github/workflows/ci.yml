@@ -1,4 +1,4 @@
-# flutter-package template rev 3 — per-push lane.
+# flutter-package template rev 5 — per-push lane.
 # Kept fast enough to actually wait for. Slow and release-only checks live in release.yml.
 # See CLAUDE.md §4.
 #

@@ -737,13 +737,13 @@ void main() {
         wrap(
           HardwareScannerWidget(
             controller: controller,
-            child: const Text('scan a badge'),
+            child: const Text('scan a barcode'),
           ),
         ),
       );
       await tester.pump();
 
-      expect(find.text('scan a badge'), findsOneWidget);
+      expect(find.text('scan a barcode'), findsOneWidget);
       expect(find.byType(EditableText), findsOneWidget);
     });
 
@@ -757,13 +757,13 @@ void main() {
           HardwareScannerWidget(
             controller: controller,
             captureTextInput: false,
-            child: const Text('scan a badge'),
+            child: const Text('scan a barcode'),
           ),
         ),
       );
       await tester.pump();
 
-      expect(find.text('scan a badge'), findsOneWidget);
+      expect(find.text('scan a barcode'), findsOneWidget);
       expect(find.byType(EditableText), findsNothing);
       expect(find.byType(KeyboardListener), findsOneWidget);
     });

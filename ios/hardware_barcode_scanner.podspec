@@ -4,7 +4,7 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'hardware_barcode_scanner'
-  s.version          = '0.1.0'
+  s.version          = '0.1.1'
   s.summary          = 'Unified hardware scanner input for Flutter.'
   s.description      = <<-DESC
 Unified hardware scanner input for HID scanners and rugged Android broadcast scanners.
