@@ -1,3 +1,13 @@
+## 0.1.2
+
+### October 13, 2026
+
+**Fixed:**
+
+* Android: support built-in Kotlin / AGP 9; drop pinned AGP/KGP classpaths.
+
+See [What's new in 0.1.2](doc/whats_new_0_1_2.md) for details and examples.
+
 ## 0.1.1
 
 ### August 4, 2026
