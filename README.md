@@ -47,6 +47,10 @@ Flutter's modern `KeyEvent` and `HardwareKeyboard` APIs. The native projects
 support Android API 21+ and iOS 12+; newer Flutter releases can impose higher
 deployment targets on the consuming app.
 
+The Android project supports Android Gradle Plugin 8 and 9, with or without
+built-in Kotlin (`android.builtInKotlin`). It does not pin an AGP or Kotlin
+version of its own; the consuming app's versions are used.
+
 ## Installation
 
 Add the package to your app:
